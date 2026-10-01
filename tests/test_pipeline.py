@@ -24,8 +24,10 @@ def test_feature_policy_blocks_protected_and_operational_fields() -> None:
         pd.DataFrame(
             {
                 "age": [40],
+                "SeniorCitizen": [0],
                 "gender_identity": ["x"],
                 "customer_id": ["x"],
+                "snapshot_date": ["2025-01-01"],
                 "marketing_opt_out": [False],
                 "monthly_charges": [90],
                 "previous_monthly_charges": [80],
@@ -53,3 +55,12 @@ def test_score_obeys_tenure_optout_and_offer_cooldown() -> None:
     assert not scores.loc[1, "outreach_eligible"]
     assert not scores.loc[2, "outreach_eligible"]
     assert "customer_id" in tasks.columns
+
+
+def test_train_model_accepts_explicit_benchmark_target() -> None:
+    history = make_demo_data(300, seed=15).rename(columns={"churn_60d": "churn"})
+    bundle = train_model(history, target_column="churn")
+    assert 0 <= bundle.holdout_metrics["score_min"]
+    assert bundle.holdout_metrics["score_max"] <= 1
+    assert bundle.holdout_metrics["top_5pct_selected_rows"] == 3
+    assert 0 <= bundle.holdout_metrics["top_5pct_recall"] <= 1

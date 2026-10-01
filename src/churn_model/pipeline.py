@@ -33,6 +33,7 @@ RANDOM_STATE = 42
 
 PROTECTED_TOKENS = {
     "age",
+    "seniorcitizen",
     "gender",
     "sex",
     "race",
@@ -53,6 +54,7 @@ NON_FEATURE_COLUMNS = {
     "churn_date",
     "outcome",
     "outcome_date",
+    "snapshot_date",
 }
 
 
@@ -90,7 +92,7 @@ def prepare_features(frame: pd.DataFrame) -> pd.DataFrame:
     return result.drop(columns=list(blocked), errors="ignore")
 
 
-def _encode_target(target: pd.Series) -> pd.Series:
+def _encode_target(target: pd.Series, target_name: str = TARGET) -> pd.Series:
     if pd.api.types.is_numeric_dtype(target):
         values = set(target.dropna().unique())
         if values.issubset({0, 1}):
@@ -101,7 +103,7 @@ def _encode_target(target: pd.Series) -> pd.Series:
     normalized = target.astype("string").str.strip().str.lower()
     unknown = set(normalized.dropna().unique()) - positive - negative
     if unknown:
-        raise ValueError(f"Unrecognized {TARGET} labels: {sorted(unknown)}")
+        raise ValueError(f"Unrecognized {target_name} labels: {sorted(unknown)}")
     return normalized.isin(positive).astype(int)
 
 
@@ -196,8 +198,8 @@ def _make_estimator(
     )
 
 
-def train_model(frame: pd.DataFrame) -> ModelBundle:
-    required = {CUSTOMER_ID, TARGET, TENURE_DAYS}
+def train_model(frame: pd.DataFrame, target_column: str = TARGET) -> ModelBundle:
+    required = {CUSTOMER_ID, target_column, TENURE_DAYS}
     missing = required - set(frame.columns)
     if missing:
         raise ValueError(f"Training data is missing required columns: {sorted(missing)}")
@@ -205,17 +207,15 @@ def train_model(frame: pd.DataFrame) -> ModelBundle:
     eligible = frame.loc[
         pd.to_numeric(frame[TENURE_DAYS], errors="coerce") >= MINIMUM_TENURE_DAYS
     ].copy()
-    eligible = eligible.loc[eligible[TARGET].notna()].reset_index(drop=True)
+    eligible = eligible.loc[eligible[target_column].notna()].reset_index(drop=True)
     if eligible.empty:
         raise ValueError("No labeled training rows meet the 30-day tenure rule.")
 
-    labels = _encode_target(eligible[TARGET])
+    labels = _encode_target(eligible[target_column], target_column)
     if labels.nunique() != 2 or labels.value_counts().min() < 10:
         raise ValueError("Training requires at least 10 examples from each churn class.")
 
-    features = prepare_features(eligible).drop(
-        columns=[TARGET], errors="ignore"
-    )
+    features = prepare_features(eligible).drop(columns=[target_column], errors="ignore")
     feature_columns = list(features.columns)
     if not feature_columns:
         raise ValueError("No eligible model features remain after policy exclusions.")
@@ -237,11 +237,28 @@ def train_model(frame: pd.DataFrame) -> ModelBundle:
 
     probabilities = model.predict_proba(valid_x)[:, 1]
     high_risk = probabilities >= HIGH_RISK_THRESHOLD
+    budget_count = max(1, int(np.ceil(0.05 * len(probabilities))))
+    budget_indices = np.argsort(-probabilities, kind="stable")[:budget_count]
+    budget_risk = np.zeros(len(probabilities), dtype=bool)
+    budget_risk[budget_indices] = True
     metrics = {
         "roc_auc": float(roc_auc_score(valid_y, probabilities)),
         "high_tier_recall": float(recall_score(valid_y, high_risk, zero_division=0)),
         "high_tier_precision": float(precision_score(valid_y, high_risk, zero_division=0)),
         "high_tier_share": float(high_risk.mean()),
+        "top_5pct_selected_rows": float(budget_count),
+        "top_5pct_cutoff": float(probabilities[budget_indices].min()),
+        "top_5pct_recall": float(recall_score(valid_y, budget_risk, zero_division=0)),
+        "top_5pct_precision": float(precision_score(valid_y, budget_risk, zero_division=0)),
+        "medium_tier_share": float(
+            ((probabilities >= MEDIUM_RISK_THRESHOLD) & ~high_risk).mean()
+        ),
+        "low_tier_share": float((probabilities < MEDIUM_RISK_THRESHOLD).mean()),
+        "score_min": float(probabilities.min()),
+        "score_median": float(np.median(probabilities)),
+        "score_p90": float(np.quantile(probabilities, 0.90)),
+        "score_p95": float(np.quantile(probabilities, 0.95)),
+        "score_max": float(probabilities.max()),
         "holdout_rows": float(len(valid_y)),
     }
     return ModelBundle(model, feature_columns, numeric_columns, categorical_columns, metrics)

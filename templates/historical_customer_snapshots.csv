@@ -1,0 +1,1 @@
+customer_id,snapshot_date,tenure_days,churn_60d,contract_type,monthly_charges,previous_monthly_charges,support_calls_90d,data_usage_gb,customer_lifetime_value,marketing_opt_out,last_offer_date

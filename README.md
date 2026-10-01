@@ -49,6 +49,18 @@ churn-model score --input data/demo_scoring.csv --model models/churn.joblib --ou
 
 Training saves the model at `models/churn.joblib`. The CLI exits with code `2` and prints an alert if holdout AUC is below `0.70` or High-tier recall is below `0.75`. This is an approval warning, not necessarily a training failure. The synthetic data may fail these targets.
 
+## IBM Kaggle Benchmark
+
+The [IBM Telco Customer Churn dataset on Kaggle](https://www.kaggle.com/datasets/blastchar/telco-customer-churn) can be used for an exploratory benchmark. Download and extract `WA_Fn-UseC_-Telco-Customer-Churn.csv` to `data/ibm_telco/`, then run:
+
+```powershell
+python scripts/benchmark_ibm_telco.py
+```
+
+The benchmark adapter excludes demographic fields, cleans `TotalCharges`, and converts tenure months to approximate days for the existing 30-day eligibility rule. The downloaded data remains local: all of `data/` is ignored by Git and is not included in this repository.
+
+**This is not a 60-day churn evaluation.** Kaggle describes one row per customer and a general `Churn` label; it provides no monthly snapshot date or measured 60-day outcome. On the downloaded 7,043-row file, the current stratified random holdout had 1,407 rows and produced AUC **0.840**. The fixed 0.70 cutoff selected 102 customers (**7.2%**) with **81.4% precision** and **22.2% recall**. Selecting exactly the top 5% by score (71 holdout customers) yielded **83.1% precision** and **15.8% recall**. The holdout score distribution was min **0.027**, median **0.169**, p90 **0.664**, p95 **0.721**, max **0.793**; tier shares were Low **68.2%**, Medium **24.6%**, High **7.2%**. These figures are for a public static benchmark only; do not treat them as approval or expected production performance.
+
 ## Dashboard
 
 ### Demo Screenshot
@@ -75,6 +87,18 @@ Use `demo_customers.csv` for **training** because it contains the `churn_60d` ou
 
 ## CSV Data Contract
 
+### Preparing Historical Customer Snapshots
+
+Use [`templates/historical_customer_snapshots.csv`](templates/historical_customer_snapshots.csv) as a header-only starting point for an approved warehouse extract. It contains no customer records. Populate one row per customer per monthly snapshot, keeping the same pseudonymous `customer_id` across that customer's snapshots.
+
+- Set `snapshot_date` to the date the features describe. Feature values must be known as of that date; do not include information recorded afterward.
+- Set `churn_60d` to `1` only when the customer churned during the 60 days after that snapshot, and `0` when they remained active for the full window. Leave out snapshots whose full 60-day outcome window has not elapsed.
+- Keep `tenure_days` and the feature values as of the snapshot. `last_offer_date` must also be the date known at that time.
+- Use the approved features your organization permits. Do not include direct identifiers or protected demographic attributes. The template's `customer_id` should be pseudonymized consistently, not replaced with names, phone numbers, or account numbers.
+- Keep the populated file local and access-controlled. The entire `data/` directory is ignored by Git; do not commit customer data or upload it to a public repository.
+
+`snapshot_date` is treated as metadata and excluded from the model features. **Important:** the current trainer evaluates with a stratified random row split. If multiple monthly rows for each customer are included, snapshots from the same customer can appear in both training and holdout sets. Do not treat those metrics as production validation; a customer-grouped or time-based holdout must be implemented and used before approving a model trained on repeated snapshots.
+
 Training data must contain:
 
 | Column | Description |
@@ -83,7 +107,7 @@ Training data must contain:
 | `tenure_days` | Customer tenure at the historical snapshot |
 | `churn_60d` | Whether the customer churned within 60 days of that snapshot; accepts binary or common yes/no labels |
 
-At least 10 examples of each outcome must remain after applying the 30-day tenure rule. For useful training, provide multiple historical snapshots and a correctly observed 60-day outcome.
+At least 10 examples of each outcome must remain after applying the 30-day tenure rule. Multiple historical snapshots can improve coverage across time, but use a customer-grouped or chronological holdout before trusting evaluation metrics when customers have repeated rows.
 
 Scoring data must contain `customer_id`, `tenure_days`, `customer_lifetime_value`, and every model feature used at training time. Useful feature examples include `contract_type`, `monthly_charges`, `previous_monthly_charges`, `support_calls_90d`, and usage aggregates. `monthly_charge_change` is derived when both current and previous monthly charges are present.
 

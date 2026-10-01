@@ -4,6 +4,6 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 *.joblib
-data/*.csv
+data/
 models/
 outputs/
