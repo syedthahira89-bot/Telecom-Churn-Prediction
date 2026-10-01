@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "telecom-churn-model"
+version = "0.1.0"
+description = "Stacked ensemble churn scoring starter for telecom retention workflows"
+requires-python = ">=3.10"
+dependencies = [
+    "altair>=5.0",
+    "joblib>=1.3",
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "scikit-learn>=1.4",
+    "shap>=0.45",
+    "streamlit>=1.50",
+    "xgboost>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+churn-model = "churn_model.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
