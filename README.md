@@ -61,6 +61,14 @@ The benchmark adapter excludes demographic fields, cleans `TotalCharges`, and co
 
 **This is not a 60-day churn evaluation.** Kaggle describes one row per customer and a general `Churn` label; it provides no monthly snapshot date or measured 60-day outcome. On the downloaded 7,043-row file, the current stratified random holdout had 1,407 rows and produced AUC **0.840**. The fixed 0.70 cutoff selected 102 customers (**7.2%**) with **81.4% precision** and **22.2% recall**. Selecting exactly the top 5% by score (71 holdout customers) yielded **83.1% precision** and **15.8% recall**. The holdout score distribution was min **0.027**, median **0.169**, p90 **0.664**, p95 **0.721**, max **0.793**; tier shares were Low **68.2%**, Medium **24.6%**, High **7.2%**. These figures are for a public static benchmark only; do not treat them as approval or expected production performance.
 
+### Benchmark Insights and Recommendations
+
+- The AUC indicates useful ranking on this static dataset, but does not establish calibrated 60-day probabilities or campaign value.
+- The fixed 0.70 cutoff exceeds a 5% contact capacity (7.2% selected). Restricting selection to the top 5% slightly increased precision (81.4% to 83.1%) but reduced recall (22.2% to 15.8%). This is a capacity-versus-capture tradeoff, not evidence that either policy is optimal.
+- Before selecting a threshold, compare precision, recall, and selected volume across multiple validation splits; calibrate probabilities on separate validation data. Do not tune and report performance on the same holdout.
+- For the stated 60-day use case, replace this benchmark evaluation with approved, dated historical snapshots and mature 60-day outcomes. Use a chronological holdout; if customers have repeated snapshots, keep each customer isolated between training and validation.
+- Before claiming retention impact or ROI, run a controlled campaign experiment with an appropriate control group and track offer cost, incremental retention, and revenue outcomes.
+
 ## Dashboard
 
 ### Demo Screenshot
