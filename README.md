@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Telecom Churn Prediction
 
 A Python starter project for identifying telecom customers at risk of cancelling within 60 days. It trains a stacked ensemble of Random Forest, XGBoost, and Logistic Regression models, assigns risk tiers, calculates customer-level SHAP explanations, and prepares budget-ranked retention task exports.
