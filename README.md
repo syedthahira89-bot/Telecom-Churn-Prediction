@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Telecom Churn Prediction
 
 A Python starter project for identifying telecom customers at risk of cancelling within 60 days. It trains a stacked ensemble of Random Forest, XGBoost, and Logistic Regression models, assigns risk tiers, calculates customer-level SHAP explanations, and prepares budget-ranked retention task exports.
@@ -51,6 +50,12 @@ churn-model score --input data/demo_scoring.csv --model models/churn.joblib --ou
 Training saves the model at `models/churn.joblib`. The CLI exits with code `2` and prints an alert if holdout AUC is below `0.70` or High-tier recall is below `0.75`. This is an approval warning, not necessarily a training failure. The synthetic data may fail these targets.
 
 ## Dashboard
+
+### Demo Screenshot
+
+The screenshot below shows the dashboard populated with synthetic demo data. Its model metrics are illustrative only and are not approved for customer outreach.
+
+![Telecom churn retention dashboard demo](docs/images/churn-dashboard-demo.png)
 
 Start the local dashboard:
 
